@@ -7,6 +7,9 @@ import {OutcomeToken} from "./OutcomeToken.sol";
 /// @notice Deploys OutcomeToken instances with deterministic addresses via CREATE2
 /// @dev Used by MultiOutcomePredictionMarketHook to create N outcome tokens per market
 contract OutcomeTokenFactory {
+    /// @notice The authorized caller (the hook contract) that can create tokens
+    address public authorizedCaller;
+
     /// @notice Registry of deployed tokens: keccak256(marketId, outcomeIndex) => token address
     mapping(bytes32 => address) public tokens;
 
@@ -20,6 +23,15 @@ contract OutcomeTokenFactory {
         string name,
         string symbol
     );
+
+    event AuthorizedCallerSet(address caller);
+
+    /// @notice Set the authorized caller (can only be set once, or by current caller)
+    function setAuthorizedCaller(address _caller) external {
+        require(authorizedCaller == address(0) || msg.sender == authorizedCaller, "Not authorized");
+        authorizedCaller = _caller;
+        emit AuthorizedCallerSet(_caller);
+    }
 
     /// @notice Deploy a new outcome token with a deterministic address
     /// @param marketId The market this token belongs to
@@ -37,6 +49,8 @@ contract OutcomeTokenFactory {
         uint256 initialSupply,
         address recipient
     ) external returns (address token) {
+        require(msg.sender == authorizedCaller, "Unauthorized");
+
         bytes32 key = keccak256(abi.encodePacked(marketId, outcomeIndex));
         require(tokens[key] == address(0), "Token already exists");
 

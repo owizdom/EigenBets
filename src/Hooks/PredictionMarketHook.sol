@@ -203,13 +203,14 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
     }
 
     function _beforeRemoveLiquidity(
-        address /* sender */,
+        address sender,
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata /* params */,
         bytes calldata
     ) internal view override returns (bytes4) {
         require(_isValidPool(key), "Invalid pool");
-        require(marketOpen && !marketClosed, "Market not active");
+        // Allow the hook itself to remove liquidity during resolution (when market is closed)
+        require(sender == address(this) || (marketOpen && !marketClosed), "Market not active");
         return IHooks.beforeRemoveLiquidity.selector;
     }
 
@@ -244,15 +245,15 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
             if (usdcDelta < 0) {
                 usdcInYesPool += uint256(-usdcDelta);
             } else {
-                require(usdcInYesPool >= uint256(usdcDelta), "Insufficient USDC in YES pool");
-                usdcInYesPool -= uint256(usdcDelta);
+                uint256 abs = uint256(usdcDelta);
+                usdcInYesPool = usdcInYesPool >= abs ? usdcInYesPool - abs : 0;
             }
-            
+
             if (tokenDelta < 0) {
                 yesTokensInPool += uint256(-tokenDelta);
             } else {
-                require(yesTokensInPool >= uint256(tokenDelta), "Insufficient YES tokens in pool");
-                yesTokensInPool -= uint256(tokenDelta);
+                uint256 abs = uint256(tokenDelta);
+                yesTokensInPool = yesTokensInPool >= abs ? yesTokensInPool - abs : 0;
             }
             
             if (usdcDelta < 0 || tokenDelta < 0) {
@@ -270,15 +271,15 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
             if (usdcDelta < 0) {
                 usdcInNoPool += uint256(-usdcDelta);
             } else {
-                require(usdcInNoPool >= uint256(usdcDelta), "Insufficient USDC in NO pool");
-                usdcInNoPool -= uint256(usdcDelta);
+                uint256 abs = uint256(usdcDelta);
+                usdcInNoPool = usdcInNoPool >= abs ? usdcInNoPool - abs : 0;
             }
-            
+
             if (tokenDelta < 0) {
                 noTokensInPool += uint256(-tokenDelta);
             } else {
-                require(noTokensInPool >= uint256(tokenDelta), "Insufficient NO tokens in pool");
-                noTokensInPool -= uint256(tokenDelta);
+                uint256 abs = uint256(tokenDelta);
+                noTokensInPool = noTokensInPool >= abs ? noTokensInPool - abs : 0;
             }
             
             if (usdcDelta < 0 || tokenDelta < 0) {
@@ -421,7 +422,7 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
      * @return tokenAmount Amount of YES tokens received
      */
     function swapUSDCForYesTokens(uint256 usdcAmount) external returns (uint256 tokenAmount) {
-        return _swapExactInput(usdc, yesToken, usdcAmount, msg.sender);
+        return _swapExactInput(usdc, yesToken, usdcAmount, msg.sender, false);
     }
     
     /**
@@ -430,7 +431,7 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
      * @return tokenAmount Amount of NO tokens received
      */
     function swapUSDCForNoTokens(uint256 usdcAmount) external returns (uint256 tokenAmount) {
-        return _swapExactInput(usdc, noToken, usdcAmount, msg.sender);
+        return _swapExactInput(usdc, noToken, usdcAmount, msg.sender, false);
     }
     
     /**
@@ -439,7 +440,7 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
      * @return usdcAmount Amount of USDC received
      */
     function swapYesTokensForUSDC(uint256 tokenAmount) external returns (uint256 usdcAmount) {
-        return _swapExactInput(yesToken, usdc, tokenAmount, msg.sender);
+        return _swapExactInput(yesToken, usdc, tokenAmount, msg.sender, false);
     }
     
     /**
@@ -448,7 +449,7 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
      * @return usdcAmount Amount of USDC received
      */
     function swapNoTokensForUSDC(uint256 tokenAmount) external returns (uint256 usdcAmount) {
-        return _swapExactInput(noToken, usdc, tokenAmount, msg.sender);
+        return _swapExactInput(noToken, usdc, tokenAmount, msg.sender, false);
     }
     
     /**
@@ -457,11 +458,11 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
      * @return noAmount Amount of NO tokens received
      */
     function swapYesForNoTokens(uint256 yesAmount) external returns (uint256 noAmount) {
-        // First swap YES to USDC
-        uint256 usdcReceived = _swapExactInput(yesToken, usdc, yesAmount, address(this));
-        
-        // Then swap USDC to NO
-        noAmount = _swapExactInput(usdc, noToken, usdcReceived, msg.sender);
+        // First swap YES to USDC (pull from user)
+        uint256 usdcReceived = _swapExactInput(yesToken, usdc, yesAmount, address(this), false);
+
+        // Then swap USDC to NO (use USDC already held by hook from first leg)
+        noAmount = _swapExactInput(usdc, noToken, usdcReceived, msg.sender, true);
         
         return noAmount;
     }
@@ -472,11 +473,11 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
      * @return yesAmount Amount of YES tokens received
      */
     function swapNoForYesTokens(uint256 noAmount) external returns (uint256 yesAmount) {
-        // First swap NO to USDC
-        uint256 usdcReceived = _swapExactInput(noToken, usdc, noAmount, address(this));
-        
-        // Then swap USDC to YES
-        yesAmount = _swapExactInput(usdc, yesToken, usdcReceived, msg.sender);
+        // First swap NO to USDC (pull from user)
+        uint256 usdcReceived = _swapExactInput(noToken, usdc, noAmount, address(this), false);
+
+        // Then swap USDC to YES (use USDC already held by hook from first leg)
+        yesAmount = _swapExactInput(usdc, yesToken, usdcReceived, msg.sender, true);
         
         return yesAmount;
     }
@@ -510,15 +511,15 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
         // If direct swap is possible (USDC<->YES or USDC<->NO)
         if ((tokenIn == usdc && (tokenOut == yesToken || tokenOut == noToken)) ||
             ((tokenIn == yesToken || tokenIn == noToken) && tokenOut == usdc)) {
-            amountOut = _swapExactInput(tokenIn, tokenOut, amountIn, msg.sender);
-        } 
+            amountOut = _swapExactInput(tokenIn, tokenOut, amountIn, msg.sender, false);
+        }
         // For YES<->NO, do a 2-step swap through USDC
         else {
-            // First swap to USDC
-            uint256 usdcReceived = _swapExactInput(tokenIn, usdc, amountIn, address(this));
-            
-            // Then swap USDC to destination token
-            amountOut = _swapExactInput(usdc, tokenOut, usdcReceived, msg.sender);
+            // First swap to USDC (pull from user)
+            uint256 usdcReceived = _swapExactInput(tokenIn, usdc, amountIn, address(this), false);
+
+            // Then swap USDC to destination token (use held balance)
+            amountOut = _swapExactInput(usdc, tokenOut, usdcReceived, msg.sender, true);
         }
         
         require(amountOut >= amountOutMinimum, "Slippage: insufficient output amount");
@@ -537,18 +538,19 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
         address tokenIn,
         address tokenOut,
         uint256 amountIn,
-        address recipient
+        address recipient,
+        bool useHeldBalance
     ) internal returns (uint256 amountOut) {
         require(marketOpen && !marketClosed, "Market not active");
         require(!resolved, "Market resolved");
-        
+
         // Determine which pool to use
         PoolKey memory poolKey;
         bool zeroForOne;
-        
+
         if ((tokenIn == usdc && tokenOut == yesToken) || (tokenIn == yesToken && tokenOut == usdc)) {
             poolKey = yesPoolKey;
-            
+
             // Determine swap direction based on token positions
             if (tokenIn == Currency.unwrap(poolKey.currency0)) {
                 zeroForOne = true;
@@ -557,7 +559,7 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
             }
         } else if ((tokenIn == usdc && tokenOut == noToken) || (tokenIn == noToken && tokenOut == usdc)) {
             poolKey = noPoolKey;
-            
+
             // Determine swap direction based on token positions
             if (tokenIn == Currency.unwrap(poolKey.currency0)) {
                 zeroForOne = true;
@@ -567,10 +569,9 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
         } else {
             revert("Unsupported token pair");
         }
-        
-        // Approve token transfers
-        if (tokenIn != address(this)) {
-            // Only approve if the caller is not the contract itself
+
+        // Transfer tokens from user unless contract already holds them (two-hop intermediate)
+        if (!useHeldBalance) {
             IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         }
         IERC20(tokenIn).approve(address(poolManager), amountIn);
@@ -649,7 +650,10 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
     function resolveOutcome(bool _outcomeIsYes) external onlyOwner {
         require(marketClosed, "Market not closed");
         require(!resolved, "Already resolved");
-        
+
+        // Snapshot balance before withdrawal to avoid inflation from force-fed USDC
+        uint256 balBefore = IERC20(usdc).balanceOf(address(this));
+
         // Set operation context for yes pool withdrawal
         currentOperation = OperationContext({
             operationType: OperationType.RemoveLiquidityYes,
@@ -720,8 +724,8 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
             recipient: address(0)
         });
 
-        // Update state variables - use actual USDC balance instead of reported values
-        totalUSDCCollected = IERC20(usdc).balanceOf(address(this));
+        // Use delta to avoid inflation from force-fed or leftover USDC
+        totalUSDCCollected = IERC20(usdc).balanceOf(address(this)) - balBefore;
         
         // Save token balances to use in claim calculation
         hookYesBalance = IERC20(yesToken).balanceOf(address(this));
@@ -926,8 +930,17 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
         hasClaimed[msg.sender] = true;
         
         // Transfer USDC to the user
-        IERC20(usdc).transfer(msg.sender, usdcShare);
+        IERC20(usdc).safeTransfer(msg.sender, usdcShare);
         emit Claimed(msg.sender, usdcShare);
+    }
+
+    /// @notice Sweep unclaimable USDC when no external holders of winning token exist
+    function sweepUnclaimable() external onlyOwner {
+        require(resolved, "Not resolved");
+        address winningToken = outcomeIsYes ? yesToken : noToken;
+        uint256 totalWinning = IERC20(winningToken).totalSupply() - (outcomeIsYes ? hookYesBalance : hookNoBalance);
+        require(totalWinning == 0, "Winners exist");
+        IERC20(usdc).safeTransfer(owner(), IERC20(usdc).balanceOf(address(this)));
     }
     
     // Function to get odds of YES/NO outcomes
@@ -942,10 +955,9 @@ contract PredictionMarketHook is BaseHook, Ownable, IUnlockCallback {
             return (50, 50); // Default to 50/50 if no liquidity
         }
         
-        // Higher USDC in YES pool means higher probability for NO (and vice versa)
-        // This is because USDC flows to the side people are betting against
-        noOdds = (usdcInYesPool * 100) / totalPoolUSDC;
-        yesOdds = (usdcInNoPool * 100) / totalPoolUSDC;
+        // Higher USDC in YES pool means higher demand for YES (users buy YES with USDC)
+        yesOdds = (usdcInYesPool * 100) / totalPoolUSDC;
+        noOdds = (usdcInNoPool * 100) / totalPoolUSDC;
     
         return (yesOdds, noOdds);
     }

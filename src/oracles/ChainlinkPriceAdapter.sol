@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 /// @notice Oracle adapter that resolves prediction markets based on Chainlink price feeds
 /// @dev Supports both binary (above/below target) and range-based (which price band) markets
 contract ChainlinkPriceAdapter is IOracleAdapter, Ownable {
+    uint256 public constant MAX_STALENESS = 3600; // 1 hour
+
     MultiOutcomePredictionMarketHook public immutable hook;
 
     // Supported price feeds: symbol => Chainlink aggregator
@@ -83,15 +85,16 @@ contract ChainlinkPriceAdapter is IOracleAdapter, Ownable {
     }
 
     /// @inheritdoc IOracleAdapter
-    function resolveMarket(uint256 marketId) external override returns (uint256[] memory winningOutcomes) {
+    function resolveMarket(uint256 marketId) external override onlyOwner returns (uint256[] memory winningOutcomes) {
         PriceMarketConfig storage config = marketConfigs[marketId];
         require(config.configured, "Market not configured");
 
-        // Fetch current price
+        // Fetch current price with staleness validation
         AggregatorV3Interface feed = AggregatorV3Interface(config.priceFeed);
-        (, int256 answer,, uint256 updatedAt,) = feed.latestRoundData();
+        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = feed.latestRoundData();
         require(answer > 0, "Invalid price");
-        require(updatedAt > 0, "Stale price");
+        require(updatedAt > 0 && block.timestamp - updatedAt <= MAX_STALENESS, "Stale price");
+        require(answeredInRound >= roundId, "Incomplete round");
 
         uint256 price = uint256(answer);
 
@@ -122,8 +125,8 @@ contract ChainlinkPriceAdapter is IOracleAdapter, Ownable {
 
         // Check price feed is responsive
         AggregatorV3Interface feed = AggregatorV3Interface(config.priceFeed);
-        try feed.latestRoundData() returns (uint80, int256 answer, uint256, uint256 updatedAt, uint80) {
-            return answer > 0 && updatedAt > 0;
+        try feed.latestRoundData() returns (uint80 roundId, int256 answer, uint256, uint256 updatedAt, uint80 answeredInRound) {
+            return answer > 0 && updatedAt > 0 && block.timestamp - updatedAt <= MAX_STALENESS && answeredInRound >= roundId;
         } catch {
             return false;
         }

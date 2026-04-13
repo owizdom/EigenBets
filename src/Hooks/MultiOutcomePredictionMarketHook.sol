@@ -120,6 +120,8 @@ contract MultiOutcomePredictionMarketHook is BaseHook, Ownable, IUnlockCallback 
     ) BaseHook(IPoolManager(_poolManager)) Ownable(tx.origin) {
         usdc = _usdc;
         tokenFactory = _tokenFactory;
+        // Register this hook as the authorized caller on the factory
+        _tokenFactory.setAuthorizedCaller(address(this));
     }
 
     // ============ Hook Permissions ============
@@ -282,18 +284,24 @@ contract MultiOutcomePredictionMarketHook is BaseHook, Ownable, IUnlockCallback 
         require(msg.sender == market.resolver || msg.sender == owner(), "Not authorized");
         require(_winningOutcomes.length > 0, "No winners specified");
 
-        // Validate outcome indices
+        // Validate outcome indices and check for duplicates
         for (uint256 i = 0; i < _winningOutcomes.length; i++) {
             require(_winningOutcomes[i] < market.outcomeCount, "Invalid outcome index");
+            for (uint256 j = 0; j < i; j++) {
+                require(_winningOutcomes[i] != _winningOutcomes[j], "Duplicate outcome");
+            }
         }
+
+        // Snapshot balance before withdrawal to isolate this market's USDC
+        uint256 balBefore = IERC20(usdc).balanceOf(address(this));
 
         // Remove liquidity from all pools
         for (uint256 i = 0; i < market.outcomeCount; i++) {
             _removeLiquidityFromPool(marketId, i);
         }
 
-        // Collect total USDC and record hook's token balances
-        market.totalUSDCCollected = IERC20(usdc).balanceOf(address(this));
+        // Use delta to capture only this market's USDC (not other markets')
+        market.totalUSDCCollected = IERC20(usdc).balanceOf(address(this)) - balBefore;
 
         for (uint256 i = 0; i < market.outcomeCount; i++) {
             outcomes[marketId][i].hookTokenBalance = IERC20(outcomes[marketId][i].token).balanceOf(address(this));
@@ -319,8 +327,8 @@ contract MultiOutcomePredictionMarketHook is BaseHook, Ownable, IUnlockCallback 
         require(winners.length > 0, "No winners");
 
         // Calculate user's share across all winning outcomes
+        // Defer division to minimize precision loss: (userBalance * totalUSDC) / (winnersCount * totalCirculating)
         uint256 totalShare = 0;
-        uint256 usdcPerWinner = market.totalUSDCCollected / winners.length;
 
         for (uint256 i = 0; i < winners.length; i++) {
             uint256 outcomeIdx = winners[i];
@@ -333,13 +341,13 @@ contract MultiOutcomePredictionMarketHook is BaseHook, Ownable, IUnlockCallback 
             uint256 totalCirculating = IERC20(token).totalSupply() - info.hookTokenBalance;
             if (totalCirculating == 0) continue;
 
-            totalShare += (userBalance * usdcPerWinner) / totalCirculating;
+            totalShare += (userBalance * market.totalUSDCCollected) / (winners.length * totalCirculating);
         }
 
         require(totalShare > 0, "No winning tokens held");
 
         hasClaimed[marketId][msg.sender] = true;
-        IERC20(usdc).transfer(msg.sender, totalShare);
+        IERC20(usdc).safeTransfer(msg.sender, totalShare);
 
         emit WinningsClaimed(marketId, msg.sender, totalShare);
     }
@@ -362,6 +370,7 @@ contract MultiOutcomePredictionMarketHook is BaseHook, Ownable, IUnlockCallback 
     ) external returns (uint256 amountOut) {
         Market storage market = markets[marketId];
         require(market.state == MarketState.Open, "Market not open");
+        require(block.timestamp <= market.endTime, "Market expired");
         require(outcomeIndex < market.outcomeCount, "Invalid outcome");
         require(amountIn > 0, "Zero amount");
 
@@ -418,8 +427,14 @@ contract MultiOutcomePredictionMarketHook is BaseHook, Ownable, IUnlockCallback 
             return odds;
         }
 
+        uint256 sumOdds = 0;
         for (uint256 i = 0; i < count; i++) {
             odds[i] = (outcomes[marketId][i].usdcInPool * 100) / totalUSDC;
+            sumOdds += odds[i];
+        }
+        // Assign truncation residual to the last outcome so odds always sum to 100
+        if (sumOdds < 100 && count > 0) {
+            odds[count - 1] += (100 - sumOdds);
         }
     }
 
@@ -503,13 +518,15 @@ contract MultiOutcomePredictionMarketHook is BaseHook, Ownable, IUnlockCallback 
     }
 
     function _beforeRemoveLiquidity(
-        address,
+        address sender,
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) internal view override returns (bytes4) {
         PoolId pid = key.toId();
         require(_isRegisteredPool[pid], "Unknown pool");
+        // Only the hook itself can remove liquidity (during resolution)
+        require(sender == address(this), "Only hook can remove liquidity");
         return IHooks.beforeRemoveLiquidity.selector;
     }
 

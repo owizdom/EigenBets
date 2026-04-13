@@ -9,9 +9,11 @@ import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.so
  * for prediction markets on token prices, sports events, or other data feeds.
  */
 contract ChainlinkPriceFeed {
+    uint256 public constant MAX_STALENESS = 3600; // 1 hour
+
     // Mapping of asset symbols to price feed addresses
     mapping(string => address) public priceFeeds;
-    
+
     // Admin address for managing price feeds
     address public admin;
     
@@ -93,10 +95,11 @@ contract ChainlinkPriceFeed {
             uint80 answeredInRound
         ) = priceFeed.latestRoundData();
         
-        // Ensure the price is valid
+        // Ensure the price is valid and fresh
         require(answer > 0, "Invalid price received");
-        require(updatedAt > 0, "Last price update timestamp is invalid");
-        
+        require(updatedAt > 0 && block.timestamp - updatedAt <= MAX_STALENESS, "Stale price");
+        require(answeredInRound >= roundId, "Incomplete round");
+
         return (answer, priceFeed.decimals(), updatedAt);
     }
     

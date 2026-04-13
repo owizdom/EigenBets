@@ -12,6 +12,8 @@ import {ChainlinkPriceFeed} from "./ChainlinkPriceFeed.sol";
  * It allows creating predictions based on asset prices from Chainlink
  */
 contract ChainlinkPredictionMarketAdapter is Ownable {
+    uint256 public constant MAX_STALENESS = 3600; // 1 hour
+
     // The prediction market hook contract
     PredictionMarketHook public predictionMarket;
     
@@ -65,7 +67,10 @@ contract ChainlinkPredictionMarketAdapter is Ownable {
     ) external onlyOwner returns (uint256 marketId) {
         address priceFeed = priceFeeds[asset];
         require(priceFeed != address(0), "Price feed not found");
-        
+
+        // Ensure the underlying hook is not already in use by another adapter market
+        require(!predictionMarket.marketOpen() && !predictionMarket.resolved(), "Hook already in use");
+
         // Initialize pools in the prediction market if not already done
         if (!predictionMarket.marketOpen() && !predictionMarket.marketClosed() && !predictionMarket.resolved()) {
             try predictionMarket.initializePools() {
@@ -122,7 +127,7 @@ contract ChainlinkPredictionMarketAdapter is Ownable {
         require(predictionMarket.marketClosed(), "Market not closed");
         require(!predictionMarket.resolved(), "Market already resolved");
         
-        // Get the current price from Chainlink
+        // Get the current price from Chainlink with staleness validation
         AggregatorV3Interface priceFeed = AggregatorV3Interface(marketPriceFeeds[marketId]);
         (
             uint80 roundId,
@@ -131,10 +136,11 @@ contract ChainlinkPredictionMarketAdapter is Ownable {
             uint256 updatedAt,
             uint80 answeredInRound
         ) = priceFeed.latestRoundData();
-        
-        // Ensure the price is valid
+
+        // Ensure the price is valid and fresh
         require(answer > 0, "Invalid price received");
-        require(updatedAt > 0, "Last price update timestamp is invalid");
+        require(updatedAt > 0 && block.timestamp - updatedAt <= MAX_STALENESS, "Stale price");
+        require(answeredInRound >= roundId, "Incomplete round");
         
         // Determine the outcome
         outcome = uint256(answer) >= marketTargetPrices[marketId];
