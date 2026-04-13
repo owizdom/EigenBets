@@ -129,80 +129,80 @@ class AppTheme {
     // Note: cardTheme updated below
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ButtonStyle(
-        backgroundColor: MaterialStateProperty.resolveWith<Color>((states) {
-          if (states.contains(MaterialState.disabled)) {
+        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.disabled)) {
             return primaryColor.withOpacity(0.5);
           }
           return primaryColor;
         }),
-        foregroundColor: MaterialStateProperty.resolveWith<Color>((states) {
+        foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
           return textPrimary;
         }),
-        overlayColor: MaterialStateProperty.resolveWith<Color>((states) {
-          if (states.contains(MaterialState.pressed)) {
+        overlayColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.pressed)) {
             return Colors.white.withOpacity(0.2);
           }
           return Colors.transparent;
         }),
-        elevation: MaterialStateProperty.resolveWith<double>((states) {
-          if (states.contains(MaterialState.pressed)) {
+        elevation: WidgetStateProperty.resolveWith<double>((states) {
+          if (states.contains(WidgetState.pressed)) {
             return 0;
           }
-          if (states.contains(MaterialState.hovered)) {
+          if (states.contains(WidgetState.hovered)) {
             return 2;
           }
           return 0;
         }),
-        padding: MaterialStateProperty.all<EdgeInsetsGeometry>(
+        padding: WidgetStateProperty.all<EdgeInsetsGeometry>(
           const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
-        shape: MaterialStateProperty.all<OutlinedBorder>(
+        shape: WidgetStateProperty.all<OutlinedBorder>(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
         animationDuration: const Duration(milliseconds: 200),
-        shadowColor: MaterialStateProperty.all<Color>(
+        shadowColor: WidgetStateProperty.all<Color>(
           primaryColor.withOpacity(0.5),
         ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: ButtonStyle(
-        foregroundColor: MaterialStateProperty.resolveWith<Color>((states) {
-          if (states.contains(MaterialState.disabled)) {
+        foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.disabled)) {
             return primaryColor.withOpacity(0.5);
           }
           return primaryColor;
         }),
-        side: MaterialStateProperty.resolveWith<BorderSide>((states) {
-          if (states.contains(MaterialState.disabled)) {
+        side: WidgetStateProperty.resolveWith<BorderSide>((states) {
+          if (states.contains(WidgetState.disabled)) {
             return BorderSide(color: primaryColor.withOpacity(0.5));
           }
-          if (states.contains(MaterialState.pressed)) {
+          if (states.contains(WidgetState.pressed)) {
             return const BorderSide(color: highlightColor, width: 2);
           }
-          if (states.contains(MaterialState.hovered)) {
+          if (states.contains(WidgetState.hovered)) {
             return const BorderSide(color: secondaryColor, width: 1.5);
           }
           return const BorderSide(color: primaryColor);
         }),
-        overlayColor: MaterialStateProperty.resolveWith<Color>((states) {
-          if (states.contains(MaterialState.pressed)) {
+        overlayColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.pressed)) {
             return primaryColor.withOpacity(0.1);
           }
           return Colors.transparent;
         }),
-        backgroundColor: MaterialStateProperty.resolveWith<Color>((states) {
-          if (states.contains(MaterialState.hovered)) {
+        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.hovered)) {
             return primaryColor.withOpacity(0.05);
           }
           return Colors.transparent;
         }),
-        padding: MaterialStateProperty.all<EdgeInsetsGeometry>(
+        padding: WidgetStateProperty.all<EdgeInsetsGeometry>(
           const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
-        shape: MaterialStateProperty.all<OutlinedBorder>(
+        shape: WidgetStateProperty.all<OutlinedBorder>(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -211,28 +211,28 @@ class AppTheme {
     ),
     textButtonTheme: TextButtonThemeData(
       style: ButtonStyle(
-        foregroundColor: MaterialStateProperty.resolveWith<Color>((states) {
-          if (states.contains(MaterialState.disabled)) {
+        foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.disabled)) {
             return primaryColor.withOpacity(0.5);
           }
-          if (states.contains(MaterialState.pressed)) {
+          if (states.contains(WidgetState.pressed)) {
             return highlightColor;
           }
-          if (states.contains(MaterialState.hovered)) {
+          if (states.contains(WidgetState.hovered)) {
             return secondaryColor;
           }
           return primaryColor;
         }),
-        overlayColor: MaterialStateProperty.resolveWith<Color>((states) {
-          if (states.contains(MaterialState.pressed)) {
+        overlayColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.pressed)) {
             return primaryColor.withOpacity(0.1);
           }
           return Colors.transparent;
         }),
-        padding: MaterialStateProperty.all<EdgeInsetsGeometry>(
+        padding: WidgetStateProperty.all<EdgeInsetsGeometry>(
           const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
-        textStyle: MaterialStateProperty.all<TextStyle>(
+        textStyle: WidgetStateProperty.all<TextStyle>(
           const TextStyle(
             fontWeight: FontWeight.w600,
           ),
@@ -278,20 +278,20 @@ class AppTheme {
         borderSide: const BorderSide(color: errorColor, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      prefixIconColor: MaterialStateColor.resolveWith((states) {
-        if (states.contains(MaterialState.focused)) {
+      prefixIconColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) {
           return primaryColor;
         }
-        if (states.contains(MaterialState.error)) {
+        if (states.contains(WidgetState.error)) {
           return errorColor;
         }
         return textSecondary;
       }),
-      suffixIconColor: MaterialStateColor.resolveWith((states) {
-        if (states.contains(MaterialState.focused)) {
+      suffixIconColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) {
           return primaryColor;
         }
-        if (states.contains(MaterialState.error)) {
+        if (states.contains(WidgetState.error)) {
           return errorColor;
         }
         return textSecondary;
@@ -345,8 +345,8 @@ class AppTheme {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: surfaceColor,
       indicatorColor: primaryColor.withOpacity(0.15),
-      labelTextStyle: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.selected)) {
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
           return GoogleFonts.plusJakartaSans(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -360,8 +360,8 @@ class AppTheme {
           letterSpacing: -0.1,
         );
       }),
-      iconTheme: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.selected)) {
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
           return const IconThemeData(
             color: primaryColor,
             size: 24,
@@ -403,7 +403,7 @@ class AppTheme {
       shadowColor: Colors.transparent,
       selectedShadowColor: Colors.transparent,
     ),
-    tabBarTheme: TabBarTheme(
+    tabBarTheme: TabBarThemeData(
       labelColor: primaryColor,
       unselectedLabelColor: textSecondary,
       indicatorColor: primaryColor,
@@ -418,17 +418,17 @@ class AppTheme {
         letterSpacing: -0.1,
       ),
       dividerColor: Colors.transparent,
-      overlayColor: MaterialStateProperty.resolveWith<Color>((states) {
-        if (states.contains(MaterialState.pressed)) {
+      overlayColor: WidgetStateProperty.resolveWith<Color>((states) {
+        if (states.contains(WidgetState.pressed)) {
           return primaryColor.withOpacity(0.1);
         }
-        if (states.contains(MaterialState.hovered)) {
+        if (states.contains(WidgetState.hovered)) {
           return primaryColor.withOpacity(0.05);
         }
         return Colors.transparent;
       }),
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: surfaceColor,
       elevation: 5,
       shadowColor: Colors.black.withOpacity(0.3),
@@ -513,37 +513,37 @@ class AppTheme {
       surfaceTintColor: Colors.transparent,
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.disabled)) {
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
           return Colors.grey.shade400;
         }
-        if (states.contains(MaterialState.selected)) {
+        if (states.contains(WidgetState.selected)) {
           return Colors.white;
         }
         return Colors.grey.shade100;
       }),
-      trackColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.disabled)) {
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
           return Colors.grey.shade600;
         }
-        if (states.contains(MaterialState.selected)) {
+        if (states.contains(WidgetState.selected)) {
           return primaryColor;
         }
         return subtleAccent;
       }),
-      trackOutlineColor: MaterialStateProperty.resolveWith((states) {
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
         return Colors.transparent;
       }),
       materialTapTargetSize: MaterialTapTargetSize.padded,
-      overlayColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.pressed)) {
+      overlayColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed)) {
           return primaryColor.withOpacity(0.2);
         }
         return Colors.transparent;
       }),
     ),
     // Add card theme with better elevation and borders
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: cardColor,
       elevation: 0,
       shadowColor: Colors.black.withOpacity(0.3),
