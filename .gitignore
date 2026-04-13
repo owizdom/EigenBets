@@ -17,3 +17,6 @@ docs/
 # Node modules
 node_modules/
 broadcast/
+
+# Flutter build artifacts
+flutter-front-end-so-wow/build/
