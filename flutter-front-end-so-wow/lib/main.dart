@@ -9,11 +9,13 @@ import 'screens/wallet_screen.dart';
 import 'screens/markets_screen.dart';
 import 'screens/create_market_screen.dart';
 import 'screens/analytics_screen.dart';
+import 'screens/community_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/wallet_service.dart';
 import 'services/web3_service.dart';
 import 'services/deep_link_handler.dart';
 import 'services/analytics_provider.dart';
+import 'services/social_provider.dart';
 import 'utils/webview_initialization.dart'; // Create this utility file
 import 'services/webview_manager.dart';
 import 'screens/landing_page.dart';
@@ -61,6 +63,7 @@ void main() {
           ChangeNotifierProvider(create: (context) => Web3Service()),
           ChangeNotifierProvider(create: (context) => MetaMaskProvider()..init()),
           ChangeNotifierProvider(create: (context) => AnalyticsProvider()),
+          ChangeNotifierProvider(create: (context) => SocialProvider()),
         ],
         child: const PredictionMarketApp(),
       ),
@@ -117,6 +120,7 @@ class _MainAppScaffoldState extends State<MainAppScaffold> {
     const BettingScreen(),
     const WalletScreen(),
     const AnalyticsScreen(),
+    const CommunityScreen(),
   ];
 
   // Show landing page initially if user is not connected
@@ -256,6 +260,12 @@ class _MainAppScaffoldState extends State<MainAppScaffold> {
                   label: Text('Analytics'),
                   padding: EdgeInsets.symmetric(vertical: 8),
                 ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.people_outlined),
+                  selectedIcon: Icon(Icons.people),
+                  label: Text('Community'),
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                ),
               ],
             ),
           ),
@@ -299,6 +309,11 @@ class _MainAppScaffoldState extends State<MainAppScaffold> {
                   icon: Icon(Icons.insights_outlined),
                   selectedIcon: Icon(Icons.insights),
                   label: 'Analytics',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.people_outlined),
+                  selectedIcon: Icon(Icons.people),
+                  label: 'Community',
                 ),
               ],
             )

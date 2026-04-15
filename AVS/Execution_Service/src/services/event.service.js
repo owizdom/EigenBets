@@ -6,6 +6,7 @@ const ethers = require('ethers');
 const MarketEvent = require('../models/market_event.model');
 const UserPositionEvent = require('../models/user_position_event.model');
 const PriceSnapshot = require('../models/price_snapshot.model');
+const Activity = require('../models/activity.model');
 
 // Minimal ABI — matches MultiOutcomePredictionMarketHook events
 const HOOK_EVENTS_ABI = [
@@ -37,6 +38,17 @@ async function recordUserPositionEvent(doc) {
   try {
     const created = await UserPositionEvent.create(doc);
     bus.emit('user-position-event', created.toObject());
+    // Phase 4: fan out to activity feed so social screens see the bet.
+    const typeByAction = { buy: 'bet_placed', sell: 'bet_sold', claim: 'winnings_claimed' };
+    const activityType = typeByAction[doc.action];
+    if (activityType && doc.user) {
+      await recordActivity(activityType, doc.user, doc.marketId, {
+        outcomeIndex: doc.outcomeIndex,
+        usdcDelta: doc.usdcDelta,
+        tokenDelta: doc.tokenDelta,
+        txHash: doc.txHash || null
+      });
+    }
     return created;
   } catch (err) {
     console.error('[event.service] failed to persist UserPositionEvent:', err.message);
@@ -53,18 +65,44 @@ async function recordPriceSnapshot(doc) {
   }
 }
 
+// Phase 4: Activity feed write helper. Callers should not await failures —
+// analytics is eventually consistent; a failed activity write shouldn't kill
+// the main event path.
+async function recordActivity(type, actorWallet, marketId, metadata) {
+  try {
+    const doc = await Activity.create({
+      type,
+      actorWallet: (actorWallet || '').toLowerCase(),
+      marketId: marketId || null,
+      metadata: metadata || {}
+    });
+    bus.emit('activity', doc.toObject());
+    return doc;
+  } catch (err) {
+    console.error('[event.service] failed to persist Activity:', err.message);
+    return null;
+  }
+}
+
 // Synthetic event emitted by scheduler.service when an AI prediction resolves
 // off-chain. Keeps analytics endpoints meaningful when no chain listener is live.
 async function emitSyntheticResolution({ predictionId, marketId, selectedOutcome, outcomes, resultCid }) {
   const idx = outcomes ? outcomes.indexOf(selectedOutcome) : -1;
-  return recordMarketEvent({
+  const effectiveMarketId = marketId || predictionId;
+  const recorded = await recordMarketEvent({
     type: 'SyntheticResolution',
-    marketId: marketId || predictionId,
+    marketId: effectiveMarketId,
     outcomeIndex: idx >= 0 ? idx : null,
     winningOutcomes: idx >= 0 ? [idx] : [],
     txHash: resultCid || null,
     timestamp: new Date()
   });
+  // Phase 4: synthetic resolutions also show up in the global activity feed.
+  await recordActivity('market_resolved', '0x0000000000000000000000000000000000000000',
+    effectiveMarketId,
+    { selectedOutcome, outcomes, resultCid, synthetic: true }
+  );
+  return recorded;
 }
 
 // ─── Chain listener (env-guarded) ────────────────────────────────────────────
@@ -197,5 +235,6 @@ module.exports = {
   emitSyntheticResolution,
   recordMarketEvent,
   recordUserPositionEvent,
-  recordPriceSnapshot
+  recordPriceSnapshot,
+  recordActivity
 };
