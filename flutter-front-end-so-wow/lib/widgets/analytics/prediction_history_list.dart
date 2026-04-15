@@ -3,6 +3,7 @@ import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/market_analytics.dart';
 import '../../models/user_analytics.dart';
 import '../../services/analytics_provider.dart';
 import '../../theme/app_theme.dart';
