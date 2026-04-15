@@ -12,6 +12,7 @@ contract OutcomeTokenFactoryTest is Test {
 
     function setUp() public {
         factory = new OutcomeTokenFactory();
+        factory.setAuthorizedCaller(address(this));
     }
 
     function test_CreateToken() public {

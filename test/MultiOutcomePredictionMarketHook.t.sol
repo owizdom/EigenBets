@@ -48,7 +48,7 @@ contract MultiOutcomePredictionMarketHookTest is Test {
         );
 
         (address predicted, bytes32 salt) = HookMiner.find(
-            CREATE2_DEPLOYER,
+            address(this),
             flags,
             type(MultiOutcomePredictionMarketHook).creationCode,
             abi.encode(IPoolManager(POOL_MANAGER), address(usdc), address(factory))
@@ -61,6 +61,12 @@ contract MultiOutcomePredictionMarketHookTest is Test {
         );
 
         require(address(hook) == predicted, "Hook address mismatch");
+
+        // Hook constructor sets Ownable(tx.origin) — the forge default sender.
+        // Transfer to the test contract so owner-gated calls (createMarket, etc.) work.
+        address initialOwner = hook.owner();
+        vm.prank(initialOwner);
+        hook.transferOwnership(address(this));
 
         vm.label(address(hook), "MultiOutcomeHook");
         vm.label(address(usdc), "USDC");
