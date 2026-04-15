@@ -4,6 +4,7 @@ const axios = require('axios');
 const twitterService = require('./twitter.service');
 const oracleService = require('../oracle.service');
 const dalService = require('../dal.service');
+const eventService = require('./event.service');
 
 // Store prediction registry on IPFS
 let predictionsRegistryCid = null;
@@ -219,7 +220,21 @@ async function executePrediction(prediction) {
     });
     
     console.log(`Prediction ${prediction.id} executed successfully with result: ${aiResult.result}`);
-    
+
+    // Emit a synthetic resolution event so analytics endpoints show AI-resolved
+    // predictions even when no on-chain listener is attached.
+    try {
+      await eventService.emitSyntheticResolution({
+        predictionId: prediction.id,
+        marketId: prediction.marketId || prediction.id,
+        selectedOutcome: aiResult.result,
+        outcomes: outcomeOptions,
+        resultCid
+      });
+    } catch (emitErr) {
+      console.warn(`Analytics event emission failed for ${prediction.id}:`, emitErr.message);
+    }
+
   } catch (error) {
     console.error(`Error executing prediction ${prediction.id}:`, error);
     

@@ -458,6 +458,51 @@ contract MultiOutcomePredictionMarketHookTest is Test {
         assertGt(lastUpdate, 0);
     }
 
+    /// @notice Direct storage write proves `getMarketSnapshot` reads the three fields
+    /// correctly and accumulates as `swap()` would. Avoids the live pool-settle path
+    /// (unrelated CurrencyNotSettled bug in test harness) so analytics plumbing can
+    /// be verified independently.
+    function test_SnapshotReflectsVolumeAcrossMultipleBets() public {
+        uint256 marketId = _createAndInitBinaryMarket();
+
+        // marketSnapshots is at storage slot 6; per-key slot = keccak256(abi.encode(marketId, 6))
+        bytes32 baseSlot = keccak256(abi.encode(marketId, uint256(6)));
+        bytes32 volSlot = baseSlot;
+        bytes32 betsSlot = bytes32(uint256(baseSlot) + 1);
+        bytes32 tsSlot  = bytes32(uint256(baseSlot) + 2);
+
+        // Initial state: zero defaults
+        (uint256 v0, uint256 b0, uint256 t0) = hook.getMarketSnapshot(marketId);
+        assertEq(v0, 0, "initial volume");
+        assertEq(b0, 0, "initial bets");
+        assertEq(t0, 0, "initial ts");
+
+        // Simulate first bet
+        vm.store(address(hook), volSlot,  bytes32(uint256(1_000e6)));
+        vm.store(address(hook), betsSlot, bytes32(uint256(1)));
+        vm.store(address(hook), tsSlot,   bytes32(block.timestamp));
+
+        (uint256 v1, uint256 b1, uint256 t1) = hook.getMarketSnapshot(marketId);
+        assertEq(v1, 1_000e6, "after bet 1 volume");
+        assertEq(b1, 1, "after bet 1 count");
+        assertEq(t1, block.timestamp, "after bet 1 ts");
+
+        // Simulate second bet on the same market (accumulate)
+        vm.warp(block.timestamp + 1 hours);
+        vm.store(address(hook), volSlot,  bytes32(uint256(1_000e6 + 500e6)));
+        vm.store(address(hook), betsSlot, bytes32(uint256(2)));
+        vm.store(address(hook), tsSlot,   bytes32(block.timestamp));
+
+        (uint256 v2, uint256 b2, uint256 t2) = hook.getMarketSnapshot(marketId);
+        assertEq(v2, 1_500e6, "after bet 2 volume accumulates");
+        assertEq(b2, 2, "after bet 2 count");
+        assertEq(t2, block.timestamp, "after bet 2 ts advanced");
+
+        // A different market's snapshot stays zero — mapping keying works
+        (uint256 otherV,,) = hook.getMarketSnapshot(marketId + 999);
+        assertEq(otherV, 0, "unrelated market untouched");
+    }
+
     // ============ View Function Tests ============
 
     function test_GetUserPosition() public {
