@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/market_analytics.dart';
 import '../../services/analytics_provider.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Daily trading volume (stacked by outcome) for the currently selected
 /// prediction market. Reads its state from [AnalyticsProvider] and renders
@@ -236,12 +237,9 @@ class _VolumeLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: SizedBox(
-        width: 28,
-        height: 28,
-        child: CircularProgressIndicator(strokeWidth: 2.4),
-      ),
+    return const SizedBox(
+      height: 200,
+      child: ShimmerBox(height: 200, borderRadius: 10),
     );
   }
 }

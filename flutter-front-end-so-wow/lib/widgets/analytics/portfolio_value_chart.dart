@@ -6,6 +6,7 @@ import '../../models/market_analytics.dart';
 import '../../models/user_analytics.dart';
 import '../../services/analytics_provider.dart';
 import '../../theme/app_theme.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Production analytics card showing portfolio value over time (filled area)
 /// and cash flow (dashed line, no fill) with a prominent "Portfolio Value"
@@ -75,16 +76,11 @@ class PortfolioValueChart extends StatelessWidget {
     bool isLoading,
     String? error,
   ) {
-    // Loading: no data yet and a fetch is in flight.
+    // Loading: shimmer card matching chart height.
     if (snapshots == null && isLoading) {
-      return SizedBox(
+      return const SizedBox(
         height: 260,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: theme.colorScheme.primary,
-            strokeWidth: 2.5,
-          ),
-        ),
+        child: ShimmerBox(height: 260, borderRadius: 12),
       );
     }
 

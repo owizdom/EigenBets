@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/market_analytics.dart';
 import '../../services/analytics_provider.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Horizontal stacked-bar visualization of per-outcome liquidity for the
 /// currently selected market. Reads depth data from [AnalyticsProvider] and
@@ -66,14 +67,9 @@ class LiquidityDepthWidget extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (isLoading && (depth == null || depth.isEmpty)) {
-      return SizedBox(
+      return const SizedBox(
         height: 180,
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            color: theme.colorScheme.primary,
-          ),
-        ),
+        child: ShimmerBox(height: 180, borderRadius: 10),
       );
     }
 

@@ -6,6 +6,7 @@ import '../../models/market_analytics.dart';
 import '../../models/user_analytics.dart';
 import '../../services/analytics_provider.dart';
 import '../../theme/app_theme.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Production widget that visualizes a user's win / loss / open breakdown
 /// as a donut chart with an accompanying stat grid. Reads from
@@ -61,12 +62,9 @@ class WinLossBreakdown extends StatelessWidget {
     required Future<void> Function() onRetry,
   }) {
     if (isLoading && stats == null) {
-      return const Center(
-        child: SizedBox(
-          width: 32,
-          height: 32,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
+      return const SizedBox(
+        height: 180,
+        child: ShimmerBox(height: 180, borderRadius: 10),
       );
     }
 

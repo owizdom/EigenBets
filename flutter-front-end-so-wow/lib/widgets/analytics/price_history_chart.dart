@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../models/market_analytics.dart';
 import '../../services/analytics_provider.dart';
+import '../design_system/empty_state.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Production chart widget showing probability-over-time for each outcome of
 /// the currently selected prediction market. Consumes [AnalyticsProvider] and
@@ -83,42 +85,22 @@ class PriceHistoryChart extends StatelessWidget {
     bool isLoading,
     String? error,
   ) {
-    // Loading: no data yet and a fetch is in flight.
+    // Loading: shimmer card occupying the chart region.
     if (points == null && isLoading) {
-      return SizedBox(
+      return const SizedBox(
         height: 240,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: theme.colorScheme.primary,
-            strokeWidth: 2.5,
-          ),
-        ),
+        child: ShimmerBox(height: 240, borderRadius: 12),
       );
     }
 
-    // Empty: loaded but no points.
+    // Empty: loaded but no points — reticle empty state.
     if (points != null && points.isEmpty) {
-      return SizedBox(
-        height: 240,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.timeline_outlined,
-                size: 40,
-                color: theme.colorScheme.onSurface.withOpacity(0.4),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'No price history yet',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return EmptyState(
+        icon: Icons.timeline_outlined,
+        headline: 'No price history yet',
+        message: 'Trades will plot a line here as the market heats up.',
+        tint: theme.colorScheme.primary,
+        minHeight: 240,
       );
     }
 

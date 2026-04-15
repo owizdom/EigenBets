@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../models/market_analytics.dart' show AnalyticsSource;
 import '../services/social_provider.dart';
+import '../widgets/design_system/empty_state.dart';
+import '../widgets/design_system/shimmer_box.dart';
 import '../widgets/social/leaderboard_entry.dart';
 
 /// Production leaderboard screen.
@@ -129,29 +131,50 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     String? error,
     bool hardError,
   ) {
-    // Loading — nothing cached yet and a fetch is in flight. No error banner,
-    // no chips duplication; just the spinner.
+    // Loading — shimmer rows matching the leaderboard layout rather than
+    // a generic CircularProgressIndicator. Matches the list height feel.
     if (entries == null && !hardError) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // Hard error — no data to show. Single large retry card, theme-tinted.
-    if (hardError) {
-      return _ErrorState(
-        message: error ?? 'Couldn\u2019t load leaderboard',
-        onRetry: () => social.loadLeaderboard(),
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(12, 4, 12, 12),
+        child: ShimmerList(count: 8, rowHeight: 62, gap: 6),
       );
     }
 
-    // Empty — loaded fine but the window has nothing. Suggest switching to
-    // all-time, which is materially more likely to contain a result.
+    // Hard error — large EmptyState with retry action.
+    if (hardError) {
+      return EmptyState(
+        icon: Icons.sensors_off_rounded,
+        headline: 'Leaderboard unavailable',
+        message: error ?? 'Couldn\u2019t load the leaderboard right now.',
+        tint: theme.colorScheme.error,
+        action: FilledButton.icon(
+          onPressed: () => social.loadLeaderboard(),
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('Retry'),
+        ),
+      );
+    }
+
+    // Empty — suggest switching to all-time via a tonal action button.
     if (entries != null && entries.isEmpty) {
-      return _EmptyState(
-        currentPeriod: social.leaderboardPeriod,
-        onSwitchAllTime: () {
-          social.setLeaderboardPeriod('alltime');
-          social.loadLeaderboard();
-        },
+      final isAllTime = social.leaderboardPeriod.toLowerCase() == 'alltime';
+      return EmptyState(
+        icon: Icons.emoji_events_outlined,
+        headline: isAllTime ? 'No traders yet' : 'Quiet window',
+        message: isAllTime
+            ? 'The leaderboard will populate as traders place bets.'
+            : 'Nothing qualifying ranked in the current window — switch to All-time?',
+        tint: theme.colorScheme.primary,
+        action: isAllTime
+            ? null
+            : FilledButton.tonalIcon(
+                onPressed: () {
+                  social.setLeaderboardPeriod('alltime');
+                  social.loadLeaderboard();
+                },
+                icon: const Icon(Icons.all_inclusive_rounded, size: 16),
+                label: const Text('Switch to All-time'),
+              ),
       );
     }
 

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/market_analytics.dart';
 import '../../services/analytics_provider.dart';
 import '../../theme/app_theme.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Production heatmap widget: a responsive grid of market cells colored by
 /// 24h change (emerald for positive, rose for negative) reminiscent of a
@@ -267,29 +268,21 @@ class _LoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // Render a tight grid of shimmer cells so the loading state previews the
+    // real heat-map layout rather than a generic spinner.
     return SizedBox(
       height: 268,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Warming up the grid…',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.textTheme.bodySmall?.color,
-              ),
-            ),
-          ],
+      child: GridView.count(
+        crossAxisCount: 4,
+        childAspectRatio: 1.6,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: List.generate(
+          12,
+          (_) => const ShimmerBox(height: 60, borderRadius: 10),
         ),
       ),
     );

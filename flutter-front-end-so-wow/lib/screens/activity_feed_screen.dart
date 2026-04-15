@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/market_analytics.dart';
 import '../services/social_provider.dart';
 import '../services/wallet_service.dart';
+import '../widgets/design_system/empty_state.dart';
+import '../widgets/design_system/shimmer_box.dart';
 import '../widgets/social/activity_feed_item.dart';
 
 class ActivityFeedScreen extends StatefulWidget {
@@ -105,17 +107,13 @@ class _FeedListView extends StatelessWidget {
     // Wallet gating for Following and You tabs.
     if ((scope == 'following' || scope == 'you') &&
         wallet.walletAddress == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Text(
-            'Connect wallet to see your follows',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-            ),
-          ),
-        ),
+      return EmptyState(
+        icon: Icons.account_balance_wallet_outlined,
+        headline: scope == 'following' ? 'Follow your traders' : 'Your timeline',
+        message: scope == 'following'
+            ? 'Connect your wallet to see activity from the traders you follow.'
+            : 'Connect your wallet to see your own bet history and comments.',
+        tint: theme.colorScheme.primary,
       );
     }
 
@@ -128,37 +126,26 @@ class _FeedListView extends StatelessWidget {
 
     // Error state: error present and no data to show.
     if (error != null && (items == null || items.isEmpty)) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 40,
-                color: theme.colorScheme.error,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Couldn't load feed",
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () => _reload(social),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+      return EmptyState(
+        icon: Icons.sensors_off_rounded,
+        headline: "Feed unavailable",
+        message: 'We couldn\'t reach the activity feed. Tap retry to try again.',
+        tint: theme.colorScheme.error,
+        action: FilledButton.icon(
+          onPressed: () => _reload(social),
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('Retry'),
         ),
       );
     }
 
+    // Loading state: shimmer placeholder rows that feel like instruments
+    // warming up, replaces the generic CircularProgressIndicator.
     if (items == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const Padding(
+        padding: EdgeInsets.all(10),
+        child: ShimmerList(count: 6, rowHeight: 58, gap: 8),
+      );
     }
 
     final source = social.sourceFor(_providerKey);
@@ -173,18 +160,22 @@ class _FeedListView extends StatelessWidget {
           children: [
             Align(alignment: Alignment.centerLeft, child: badge),
             const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 48),
-              child: Center(
-                child: Text(
-                  scope == 'following'
-                      ? 'Follow users to see their activity here'
-                      : 'No activity yet',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                ),
-              ),
+            EmptyState(
+              icon: scope == 'following'
+                  ? Icons.rss_feed_rounded
+                  : Icons.waves_rounded,
+              headline: scope == 'following'
+                  ? 'No one to watch yet'
+                  : scope == 'you'
+                      ? 'No moves yet'
+                      : 'The wire is quiet',
+              message: scope == 'following'
+                  ? 'Follow traders on their profile to populate this feed.'
+                  : scope == 'you'
+                      ? 'Place your first bet to see your history here.'
+                      : 'No market activity in the last hour — check back soon.',
+              tint: theme.colorScheme.primary,
+              minHeight: 280,
             ),
           ],
         ),

@@ -6,6 +6,8 @@ import '../../models/market_analytics.dart';
 import '../../models/user_analytics.dart';
 import '../../services/analytics_provider.dart';
 import '../../theme/app_theme.dart';
+import '../design_system/empty_state.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Production chart widget rendering the connected user's cumulative realized
 /// + unrealized profit and loss as a smoothed `LineChart` with an area fill
@@ -113,54 +115,38 @@ class PnlChart extends StatelessWidget {
     Color lineColor,
     bool isPositive,
   ) {
-    // Loading: no data yet and a fetch is in flight.
+    // Loading: shimmer card matching chart region.
     if (points == null && isLoading) {
-      return SizedBox(
+      return const SizedBox(
         height: 240,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: theme.colorScheme.primary,
-            strokeWidth: 2.5,
-          ),
-        ),
+        child: ShimmerBox(height: 240, borderRadius: 12),
       );
     }
 
-    // Hard error with no fallback data: show retry affordance only.
+    // Hard error with no fallback data.
     if (points == null && error != null) {
-      return SizedBox(
-        height: 240,
-        child: _ErrorBanner(
-          message: error,
-          onRetry: () => provider.loadPnl(),
+      return EmptyState(
+        icon: Icons.sensors_off_rounded,
+        headline: 'P&L unavailable',
+        message: 'We lost the line to your trades — try again.',
+        tint: theme.colorScheme.error,
+        minHeight: 240,
+        action: FilledButton.icon(
+          onPressed: () => provider.loadPnl(),
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('Retry'),
         ),
       );
     }
 
     // Empty: loaded but no trades yet.
     if (points != null && points.isEmpty) {
-      return SizedBox(
-        height: 240,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.receipt_long_outlined,
-                size: 40,
-                color: theme.colorScheme.onSurface.withOpacity(0.4),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'No trades yet — place your first bet to see P&L',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return EmptyState(
+        icon: Icons.receipt_long_outlined,
+        headline: 'No trades on record',
+        message: 'Place your first bet and P&L will chart itself here.',
+        tint: AppTheme.successColor,
+        minHeight: 240,
       );
     }
 

@@ -7,6 +7,7 @@ import '../../models/market_analytics.dart';
 import '../../models/user_analytics.dart';
 import '../../services/analytics_provider.dart';
 import '../../theme/app_theme.dart';
+import '../design_system/shimmer_box.dart';
 
 /// Scrollable list of the user's past prediction-market actions
 /// (buys, sells, claims, and resolve events). Reads from [AnalyticsProvider]
@@ -500,12 +501,9 @@ class _LoadingCard extends StatelessWidget {
             ],
           ),
           const Expanded(
-            child: Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
-              ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: ShimmerBox(height: 220, borderRadius: 10),
             ),
           ),
         ],

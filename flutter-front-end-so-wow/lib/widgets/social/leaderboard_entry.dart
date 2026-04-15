@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
@@ -5,14 +6,12 @@ import 'package:provider/provider.dart';
 
 import '../../services/social_provider.dart';
 import '../../theme/app_theme.dart';
-import './follow_button.dart';
+import '../design_system/terminal_palette.dart';
+import 'follow_button.dart';
 
-/// A single row in the social leaderboard list.
-///
-/// Renders rank (with medal icons for the top three), an avatar, a
-/// display-name + shortened wallet block, a trailing metric that flexes on
-/// [sortBy], and an optional [FollowButton]. The entry map mirrors the shape
-/// produced by [SocialProvider.loadLeaderboard].
+/// A single leaderboard row with the trading-terminal look.
+/// Top-3 rows receive a continuous shimmer sweep across the medal icon —
+/// the only high-motion element on the screen, reserved for conviction.
 class LeaderboardEntryWidget extends StatelessWidget {
   final Map<String, dynamic> entry;
   final String sortBy; // 'pnl' | 'winRate' | 'volume'
@@ -35,157 +34,297 @@ class LeaderboardEntryWidget extends StatelessWidget {
         : _shortenWallet(wallet);
     final avatarUrl = entry['avatarUrl'] as String?;
 
-    final currentAddress = context.watch<SocialProvider>().currentAddress;
+    final social = context.watch<SocialProvider>();
+    final currentAddress = social.currentAddress;
     final normalizedWallet = wallet.toLowerCase();
     final showFollow = wallet.isNotEmpty &&
         (currentAddress == null || currentAddress != normalizedWallet);
+    final isFollowed = social.selfProfile?.following.contains(normalizedWallet) ?? false;
 
-    return Card(
-      color: colors.surface,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.dividerColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 36,
-              child: _RankBadge(rank: rank, theme: theme),
-            ),
-            const SizedBox(width: 8),
-            _Avatar(
-              avatarUrl: avatarUrl,
-              seed: resolvedName,
-              colors: colors,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    resolvedName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _shortenWallet(wallet),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colors.onSurface.withOpacity(0.6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            _TrailingMetric(
-              entry: entry,
-              sortBy: sortBy,
-              theme: theme,
-            ),
-            if (showFollow) ...[
-              const SizedBox(width: 10),
-              FollowButton(targetAddress: wallet),
-            ],
-          ],
+    final isTop3 = rank >= 1 && rank <= 3;
+    final rowTint = switch (rank) {
+      1 => TerminalPalette.ledAmber,
+      2 => colors.onSurface,
+      3 => TerminalPalette.ledViolet,
+      _ => AppTheme.textSecondary,
+    };
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isTop3
+            ? rowTint.withOpacity(0.05)
+            : AppTheme.surfaceColor.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isTop3
+              ? rowTint.withOpacity(0.28)
+              : theme.dividerColor,
+          width: isTop3 ? 1 : 0.8,
         ),
+        boxShadow: isTop3
+            ? [
+                BoxShadow(
+                  color: rowTint.withOpacity(0.09),
+                  blurRadius: 18,
+                  spreadRadius: -4,
+                ),
+              ]
+            : null,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 40,
+            child: _RankBadge(rank: rank, color: rowTint, isTop3: isTop3),
+          ),
+          const SizedBox(width: 8),
+          _Avatar(
+            avatarUrl: avatarUrl,
+            seed: resolvedName,
+            followed: isFollowed,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  resolvedName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _shortenWallet(wallet),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TerminalPalette.mono(
+                    context,
+                    fontSize: 10,
+                    color: colors.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          _TrailingMetric(
+            entry: entry,
+            sortBy: sortBy,
+            theme: theme,
+          ),
+          if (showFollow) ...[
+            const SizedBox(width: 10),
+            FollowButton(targetAddress: wallet),
+          ],
+        ],
       ),
     );
   }
 }
 
-/// Rank column: medal icon for the top three, `#N` text otherwise.
-class _RankBadge extends StatelessWidget {
+/// Rank column: animated medal for top-3, tabular `#N` otherwise.
+class _RankBadge extends StatefulWidget {
   final int rank;
-  final ThemeData theme;
-  const _RankBadge({required this.rank, required this.theme});
+  final Color color;
+  final bool isTop3;
+  const _RankBadge({
+    required this.rank,
+    required this.color,
+    required this.isTop3,
+  });
+
+  @override
+  State<_RankBadge> createState() => _RankBadgeState();
+}
+
+class _RankBadgeState extends State<_RankBadge>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _sweep;
+
+  @override
+  void initState() {
+    super.initState();
+    _sweep = AnimationController(
+      vsync: this,
+      duration: TerminalPalette.medalSweep,
+    );
+    if (widget.isTop3) _sweep.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RankBadge old) {
+    super.didUpdateWidget(old);
+    if (widget.isTop3 && !_sweep.isAnimating) _sweep.repeat();
+    if (!widget.isTop3 && _sweep.isAnimating) _sweep.stop();
+  }
+
+  @override
+  void dispose() {
+    _sweep.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (rank >= 1 && rank <= 3) {
-      final Color medalColor;
-      switch (rank) {
-        case 1:
-          medalColor = AppTheme.warningColor;
-          break;
-        case 2:
-          medalColor = theme.colorScheme.onSurface;
-          break;
-        default:
-          medalColor = AppTheme.highlightColor;
-      }
+    if (!widget.isTop3) {
       return Center(
-        child: Icon(
-          Icons.emoji_events,
-          color: medalColor,
-          size: 22,
-          semanticLabel: 'Rank $rank',
+        child: Text(
+          '#${widget.rank}',
+          style: TerminalPalette.mono(
+            context,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: widget.color,
+          ),
         ),
       );
     }
-    return Center(
-      child: Text(
-        '#$rank',
-        maxLines: 1,
-        overflow: TextOverflow.clip,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.7),
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _sweep,
+      builder: (context, _) {
+        return SizedBox(
+          width: 40,
+          height: 28,
+          child: CustomPaint(
+            painter: _MedalSweepPainter(
+              color: widget.color,
+              progress: _sweep.value,
+              rank: widget.rank,
+            ),
+            child: Center(
+              child: Icon(
+                Icons.emoji_events_rounded,
+                color: widget.color,
+                size: 20,
+                shadows: [
+                  Shadow(
+                    color: widget.color.withOpacity(0.75),
+                    blurRadius: 9,
+                  ),
+                ],
+                semanticLabel: 'Rank ${widget.rank}',
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
-/// Circular avatar, falling back to a coloured bubble with the first initial.
+class _MedalSweepPainter extends CustomPainter {
+  final Color color;
+  final double progress; // 0..1
+  final int rank;
+
+  _MedalSweepPainter({
+    required this.color,
+    required this.progress,
+    required this.rank,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // A diagonal light-sweep band traversing left→right over the badge.
+    final sweepWidth = size.width * 0.55;
+    final totalPath = size.width + sweepWidth;
+    final x = -sweepWidth + totalPath * progress;
+    final rect = Rect.fromLTWH(x, 0, sweepWidth, size.height);
+    final shader = LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        Colors.transparent,
+        color.withOpacity(0.45),
+        Colors.white.withOpacity(0.85),
+        color.withOpacity(0.45),
+        Colors.transparent,
+      ],
+      stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+    ).createShader(rect);
+
+    canvas.save();
+    // Diagonal rotation for a more instrument-dashboard feel.
+    canvas.translate(size.width / 2, size.height / 2);
+    canvas.rotate(-math.pi / 12);
+    canvas.translate(-size.width / 2, -size.height / 2);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = shader
+        ..blendMode = BlendMode.screen,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_MedalSweepPainter old) =>
+      old.color != color || old.progress != progress || old.rank != rank;
+}
+
 class _Avatar extends StatelessWidget {
   final String? avatarUrl;
   final String seed;
-  final ColorScheme colors;
+  final bool followed;
   const _Avatar({
     required this.avatarUrl,
     required this.seed,
-    required this.colors,
+    required this.followed,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final url = avatarUrl?.trim();
-    if (url != null && url.isNotEmpty) {
-      return CircleAvatar(
-        radius: 16,
-        backgroundColor: colors.surfaceVariant,
-        backgroundImage: NetworkImage(url),
-      );
-    }
-    final initial = seed.isNotEmpty ? seed.substring(0, 1).toUpperCase() : '?';
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: colors.primary.withOpacity(0.2),
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: colors.primary,
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
+    final avatar = (url != null && url.startsWith('http'))
+        ? CircleAvatar(
+            radius: 16,
+            backgroundColor: theme.colorScheme.surfaceVariant,
+            backgroundImage: NetworkImage(url),
+          )
+        : CircleAvatar(
+            radius: 16,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
+            child: Text(
+              seed.isNotEmpty ? seed.substring(0, 1).toUpperCase() : '?',
+              style: TerminalPalette.mono(
+                context,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          );
+    return Container(
+      padding: const EdgeInsets.all(1.6),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: followed ? TerminalPalette.ledCyan : theme.dividerColor,
+          width: followed ? 1.4 : 0.8,
         ),
+        boxShadow: followed
+            ? [
+                BoxShadow(
+                  color: TerminalPalette.ledCyan.withOpacity(0.45),
+                  blurRadius: 7,
+                ),
+              ]
+            : null,
       ),
+      child: avatar,
     );
   }
 }
 
-/// Right-aligned metric whose formatting depends on the active sort.
 class _TrailingMetric extends StatelessWidget {
   final Map<String, dynamic> entry;
   final String sortBy;
@@ -201,32 +340,28 @@ class _TrailingMetric extends StatelessWidget {
     final colors = theme.colorScheme;
     final String text;
     final Color color;
-    final FontWeight weight;
 
     switch (sortBy) {
       case 'winRate':
         final rate = _asDouble(entry['winRate']);
         text = '${(rate * 100).toStringAsFixed(1)}%';
         color = colors.primary;
-        weight = FontWeight.w700;
         break;
       case 'volume':
         final vol = _asDouble(entry['totalVolume']);
         text = '\$${_compact(vol)}';
         color = colors.onSurface;
-        weight = FontWeight.w700;
         break;
       case 'pnl':
       default:
         final pnl = _asDouble(entry['totalPnl']);
         if (pnl >= 0) {
           text = '+\$${pnl.toStringAsFixed(2)}';
-          color = AppTheme.successColor;
+          color = TerminalPalette.ledGreen;
         } else {
           text = '-\$${pnl.abs().toStringAsFixed(2)}';
-          color = AppTheme.errorColor;
+          color = TerminalPalette.ledRed;
         }
-        weight = FontWeight.w700;
     }
 
     return Text(
@@ -236,7 +371,7 @@ class _TrailingMetric extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: theme.textTheme.bodyMedium?.copyWith(
         color: color,
-        fontWeight: weight,
+        fontWeight: FontWeight.w700,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
@@ -246,25 +381,9 @@ class _TrailingMetric extends StatelessWidget {
 // ── helpers ────────────────────────────────────────────────────────────────
 
 String _shortenWallet(String wallet) {
+  if (wallet.isEmpty) return '—';
   if (wallet.length <= 10) return wallet;
-  final first = wallet.substring(0, 6);
-  final last = wallet.substring(wallet.length - 4);
-  return '$first\u2026$last';
-}
-
-String _compact(double value) {
-  final abs = value.abs();
-  final sign = value < 0 ? '-' : '';
-  if (abs >= 1e9) {
-    return '$sign${(abs / 1e9).toStringAsFixed(abs >= 1e10 ? 1 : 2)}B';
-  }
-  if (abs >= 1e6) {
-    return '$sign${(abs / 1e6).toStringAsFixed(abs >= 1e7 ? 1 : 2)}M';
-  }
-  if (abs >= 1e3) {
-    return '$sign${(abs / 1e3).toStringAsFixed(abs >= 1e4 ? 1 : 2)}k';
-  }
-  return '$sign${abs.toStringAsFixed(2)}';
+  return '${wallet.substring(0, 6)}…${wallet.substring(wallet.length - 4)}';
 }
 
 int _asInt(dynamic v) {
@@ -277,6 +396,13 @@ int _asInt(dynamic v) {
 double _asDouble(dynamic v) {
   if (v is double) return v;
   if (v is num) return v.toDouble();
-  if (v is String) return double.tryParse(v) ?? 0.0;
-  return 0.0;
+  if (v is String) return double.tryParse(v) ?? 0;
+  return 0;
+}
+
+String _compact(double n) {
+  if (n >= 1e9) return '${(n / 1e9).toStringAsFixed(1)}B';
+  if (n >= 1e6) return '${(n / 1e6).toStringAsFixed(1)}M';
+  if (n >= 1e3) return '${(n / 1e3).toStringAsFixed(1)}K';
+  return n.toStringAsFixed(0);
 }
