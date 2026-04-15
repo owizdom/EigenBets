@@ -154,68 +154,68 @@ async function checkPendingPredictions() {
 // Execute a prediction by getting tweets and calling AI
 async function executePrediction(prediction) {
   try {
-    console.log(`Executing prediction ${prediction.id}`);
-    
+    console.log(`Executing prediction ${prediction.id} (source: ${prediction.dataSourceType || 'twitter'})`);
+
     // Extract the condition from the input string
-    // Assuming format: "Condition: {condition}\nX post: {tweet}"
+    // Assuming format: "Condition: {condition}\nX post: {tweet}" (legacy) or just "Condition: {condition}"
     const conditionMatch = prediction.inputString.match(/Condition: (.*?)(?:\n|$)/);
     const condition = conditionMatch ? conditionMatch[1].trim() : '';
-    
+
     if (!condition) {
       throw new Error('Could not extract condition from input string');
     }
-    
-    // Fetch relevant tweets from Twitter scraper
-    let tweets;
-    try {
-      tweets = await twitterService.fetchRelevantTweets(condition);
-    } catch (error) {
-      console.error('Error fetching tweets:', error);
-      // Use original input if tweets can't be fetched
-      tweets = [];
-    }
-    
-    // Prepare the complete input for the AI agent
-    let inputForAI;
-    
-    if (tweets.length > 0) {
-      // Format with new tweets
-      const tweetTexts = tweets.map(tweet => tweet.text).join('\n\n');
-      inputForAI = `Condition: ${condition}\nX post: ${tweetTexts}`;
-    } else {
-      // Use the original input if no tweets found
-      inputForAI = prediction.inputString;
-    }
-    
-    // Call the performer AI node
-    const aiResult = await oracleService.callPerformerNode(inputForAI);
-    
-    // Prepare data for IPFS
+
+    // Route through the plugin registry based on dataSourceType
+    const dataSourceType = prediction.dataSourceType || 'twitter';
+    const params = prediction.dataParams || {};
+    const outcomeOptions = prediction.outcomes || ['yes', 'no'];
+
+    // executeVerification: fetch → format → call AI (via the right plugin)
+    const aiResult = await oracleService.executeVerification(
+      dataSourceType,
+      condition,
+      params,
+      outcomeOptions
+    );
+
+    const inputForAI = aiResult.formattedInput;
+
+    // Prepare data for IPFS — include outcomes so validator can re-verify correctly
     const resultData = {
       inputString: inputForAI,
       originalPredictionId: prediction.id,
       result: aiResult.result,
+      outcomes: outcomeOptions,
+      dataSourceType,
+      dataParams: params,
+      condition,
       timestamp: new Date().toISOString()
     };
-    
+
     // Publish result to IPFS
     const resultCid = await dalService.publishJSONToIpfs(resultData);
-    
+
     // Send the task to the network
     const data = JSON.stringify({
       inputString: inputForAI,
-      result: aiResult.result
+      result: aiResult.result,
+      outcomes: outcomeOptions,
+      dataSourceType
     });
-    
+
     await dalService.sendTask(resultCid, data, prediction.taskDefinitionId);
     
     // Update prediction status in registry
     await updatePrediction(prediction.id, {
       status: 'executed',
+      selectedOutcome: aiResult.result,
       result: aiResult.result,
       resultCid: resultCid,
       executedAt: new Date().toISOString(),
-      tweetIds: tweets.map(tweet => tweet.id)
+      // Preserve tweetIds for backward compat when source is Twitter
+      tweetIds: (dataSourceType === 'twitter' && Array.isArray(aiResult.rawData))
+        ? aiResult.rawData.map(t => t.id).filter(Boolean)
+        : []
     });
     
     console.log(`Prediction ${prediction.id} executed successfully with result: ${aiResult.result}`);

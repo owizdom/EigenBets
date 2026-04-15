@@ -87,8 +87,84 @@ async function callPerformerNode(inputString, outcomeOptions) {
   }
 }
 
+/**
+ * Execute verification using the data source plugin system.
+ * Routes through the registry: fetch data → format for AI → call AI → normalize.
+ * @param {string} dataSourceType - Plugin type (twitter, news, financial, sports, weather, onchain)
+ * @param {string} condition - The prediction condition
+ * @param {object} params - Data-source-specific parameters
+ * @param {string[]} outcomeOptions - Possible outcomes (defaults to ['yes','no'])
+ * @returns {Promise<{result: string, rawData: any, formattedInput: string, fullResponse: any}>}
+ */
+async function executeVerification(dataSourceType, condition, params, outcomeOptions) {
+  const registry = require('./datasources/registry');
+  const datasource = registry.get(dataSourceType || 'twitter');
+
+  // 1. Fetch raw data from the source
+  const rawData = await datasource.fetchData(condition, params || {});
+
+  // 2. Format for the AI
+  const formattedInput = datasource.formatForAI(rawData, condition);
+
+  // 3. Get the appropriate system prompt
+  const systemPrompt = datasource.getSystemPrompt(outcomeOptions);
+
+  // 4. Call the AI with the plugin's prompt
+  const aiResult = await callAIWithPrompt(systemPrompt, formattedInput, outcomeOptions);
+
+  return {
+    result: aiResult.result,
+    rawData,
+    formattedInput,
+    fullResponse: aiResult.fullResponse
+  };
+}
+
+/**
+ * Call the Hyperbolic AI with an arbitrary system prompt and user input.
+ * Factored out of callPerformerNode so executeVerification can use custom prompts.
+ */
+async function callAIWithPrompt(systemPrompt, inputString, outcomeOptions) {
+  try {
+    const data = {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: inputString }
+      ],
+      model: "deepseek-ai/DeepSeek-V3",
+      max_tokens: 512,
+      temperature: 0.1,
+      top_p: 0.9,
+      stream: false
+    };
+
+    const response = await axios.post('https://api.hyperbolic.xyz/v1/chat/completions', data, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXJtb3R0Y29sZUBnbWFpbC5jb20iLCJpYXQiOjE3NDA2NDcxOTd9.GS3_-4c78vnl0K5RmiBLE4HJuQmKxdEodYDv1o48vsk"
+      }
+    });
+
+    const rawResult = response.data.choices[0].message.content.trim().toLowerCase();
+
+    // Normalize: match against outcomeOptions
+    let result = rawResult;
+    if (outcomeOptions && outcomeOptions.length > 0) {
+      const match = outcomeOptions.find(o => o.toLowerCase() === rawResult);
+      if (match) result = match.toLowerCase();
+    }
+
+    return { result, fullResponse: response.data };
+  } catch (error) {
+    console.error("Error calling Hyperbolic AI:", error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   getPrice,
   callPerformerNode,
+  callAIWithPrompt,
+  executeVerification,
   buildSystemPrompt
 }
