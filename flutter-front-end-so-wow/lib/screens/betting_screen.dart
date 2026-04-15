@@ -4,6 +4,8 @@ import '../widgets/market_odds_display.dart';
 import '../widgets/token_swap_widget.dart';
 import '../widgets/wallet_balance_widget.dart';
 import '../widgets/avs_verification_indicator.dart';
+import '../widgets/social/market_comments.dart';
+import '../widgets/social/share_button.dart';
 import '../models/market_data.dart';
 import '../services/avs_service.dart';
 import 'dart:math' as math;
@@ -186,6 +188,10 @@ class _BettingScreenState extends State<BettingScreen> {
             tooltip: 'Betting History',
             onPressed: () {},
           ),
+          ShareButton(
+            marketId: _selectedMarket.id,
+            marketTitle: _selectedMarket.title,
+          ),
           const SizedBox(width: 16),
         ],
       ),
@@ -202,7 +208,10 @@ class _BettingScreenState extends State<BettingScreen> {
 
   Widget _buildDesktopLayout() {
     return SingleChildScrollView(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Left column - Market selection and odds
@@ -286,6 +295,10 @@ class _BettingScreenState extends State<BettingScreen> {
           ),
         ],
       ),
+          const SizedBox(height: 24),
+          MarketComments(marketId: _selectedMarket.id),
+        ],
+      ),
     );
   }
 
@@ -359,6 +372,8 @@ class _BettingScreenState extends State<BettingScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 24),
+          MarketComments(marketId: _selectedMarket.id),
         ],
       ),
     );
@@ -434,6 +449,8 @@ class _BettingScreenState extends State<BettingScreen> {
               child: const TokenSwapWidget(),
             ),
           ),
+          const SizedBox(height: 16),
+          MarketComments(marketId: _selectedMarket.id),
         ],
       ),
     );
